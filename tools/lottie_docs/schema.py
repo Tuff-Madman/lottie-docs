@@ -84,7 +84,7 @@ class Schema:
         path = SchemaPath(path)
         obj = path.walk(self)
         if obj is None:
-            raise Exception("Schema object %s not found" % path)
+            raise Exception(f"Schema object {path} not found")
         return Schema(obj, path)
 
     def items(self):

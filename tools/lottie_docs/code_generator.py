@@ -15,7 +15,7 @@ class TypeReference:
 
     @property
     def key(self):
-        return self.module + "." + self.name
+        return f"{self.module}.{self.name}"
 
     def __str__(self):
         return self.key
@@ -108,8 +108,10 @@ class Effect(Class):
         super().__init__(reference, schema)
         self.effect_controls = []
         if "ef" in self.property_dict:
-            for item in self.property_dict["ef"].schema / "prefixItems":
-                self.effect_controls.append(self.Property(item.get("title"), item))
+            self.effect_controls.extend(
+                self.Property(item.get("title"), item)
+                for item in self.property_dict["ef"].schema / "prefixItems"
+            )
 
 
 
@@ -150,14 +152,16 @@ class LottieCodeGenerator:
 
     def on_module(self, module_name, module_schema):
         self.on_module_start(module_name, module_schema)
-        ref_base = "#/$defs/" + module_name + "/"
+        ref_base = f"#/$defs/{module_name}/"
 
         classes = []
         to_define = set()
 
         for class_name, class_schema in module_schema.items():
-            cls = self.on_type(TypeReference(module_name, class_name, ref_base + class_name), class_schema)
-            if cls:
+            if cls := self.on_type(
+                TypeReference(module_name, class_name, ref_base + class_name),
+                class_schema,
+            ):
                 classes.append(cls)
                 to_define.add(cls.reference.ref)
 
@@ -271,8 +275,7 @@ class LottieCodeGenerator:
     def title_to_snake(cls, title):
         "Converts a title to snake_case"
         return cls.anti_camel_re.sub(
-            lambda m: m.group(1) + "_" + m.group(2),
-            cls.snake_re.sub("_", title)
+            lambda m: f"{m.group(1)}_{m.group(2)}", cls.snake_re.sub("_", title)
         ).lower()
 
 
@@ -286,7 +289,7 @@ class ExampleGenerator(LottieCodeGenerator):
         sys.stdout.write("\n")
 
     def on_class(self, item: Class):
-        sys.stdout.write("%s.%s" % (item.reference.module, self.title_to_camel(item.title)))
+        sys.stdout.write(f"{item.reference.module}.{self.title_to_camel(item.title)}")
 
         if item.bases:
             sys.stdout.write(" (")
@@ -331,8 +334,7 @@ if __name__ == "__main__":
     generator = ExampleGenerator.default()
     if not what:
         generator.run()
+    elif what.strip("#/").replace("$defs/", "").count("/"):
+        generator.run_item(what)
     else:
-        if what.strip("#/").replace("$defs/", "").count("/"):
-            generator.run_item(what)
-        else:
-            generator.run_module(what)
+        generator.run_module(what)
