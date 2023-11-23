@@ -79,13 +79,13 @@ def cmd_summary(ns):
     schema = SchemaLocationPath(ns.root)
     summary = schema.get_summary(schema.fetch(ns.object_ref))
     print(summary.title)
-    print("type: %s" % summary.type)
+    print(f"type: {summary.type}")
     print("properties:")
     for prop in sorted(summary.properties):
-        print(" * " + prop)
+        print(f" * {prop}")
     print("required:")
     for prop in sorted(summary.required):
-        print(" * " + prop)
+        print(f" * {prop}")
 
 
 def diff_sets(vals1, vals2, show_same):
@@ -98,7 +98,7 @@ def diff_sets(vals1, vals2, show_same):
             op = "-"
         elif item in vals2:
             op = "+"
-        print(" %s %s" % (op, item))
+        print(f" {op} {item}")
 
 
 def cmd_diff(ns):
@@ -208,8 +208,13 @@ def cmd_compare(ns):
 
     here = SchemaLocationPath(pathlib.Path(__file__).parent.parent / "docs" / "schema")
     there = SchemaLocationPath(ns.schema_root)
-    here_unused = set(str(x.relative_to(here.root))[:-5] for x in here.root.glob("**/*.json"))
-    there_unused = set(str(x.relative_to(there.root))[:-5] for x in there.root.glob("**/*.json"))
+    here_unused = {
+        str(x.relative_to(here.root))[:-5] for x in here.root.glob("**/*.json")
+    }
+    there_unused = {
+        str(x.relative_to(there.root))[:-5]
+        for x in there.root.glob("**/*.json")
+    }
 
     here_unused -= here_ignored
 
@@ -233,7 +238,7 @@ def cmd_compare(ns):
         if not prop_diff and not req_diff:
             continue
 
-        print("%s %s" % (here_file, there_file))
+        print(f"{here_file} {there_file}")
         if prop_diff:
             print("properties:")
             diff_sets(summary_here.properties, summary_there.properties, False)

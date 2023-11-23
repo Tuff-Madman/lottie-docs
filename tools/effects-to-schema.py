@@ -90,38 +90,35 @@ def process_file(path):
                 "title": effect["nm"] + " Effect",
                 "description": "",
                 "allOf": [
-                    {
-                        "$ref": "#/$defs/effects/effect"
-                    },
+                    {"$ref": "#/$defs/effects/effect"},
                     {
                         "type": "object",
                         "properties": {
                             "ty": {
                                 "title": "Type",
                                 "type": "integer",
-                                "const": effect["ty"]
+                                "const": effect["ty"],
                             },
                             "ef": {
                                 "title": "Effect values",
                                 "type": "array",
                                 "prefixItems": [
                                     {
-                                        "title": value["nm"] if "nm" in value else "%02d" % index,
-                                        "$ref": "#/$defs/effect-values/" + get_control(value)
+                                        "title": value["nm"]
+                                        if "nm" in value
+                                        else "%02d" % index,
+                                        "$ref": f"#/$defs/effect-values/{get_control(value)}",
                                     }
                                     for index, value in enumerate(effect["ef"])
-
-                                ]
-                            }
+                                ],
+                            },
                         },
-                        "required": [
-                            "ty", "ef"
-                        ]
-                    }
-                ]
+                        "required": ["ty", "ef"],
+                    },
+                ],
             }
 
-            print("%s %s" % (effect["ty"], filename))
+            print(f'{effect["ty"]} {filename}')
 
             with open(ns.output_path / filename, "w") as f:
                 json.dump(schema, f, indent=4)

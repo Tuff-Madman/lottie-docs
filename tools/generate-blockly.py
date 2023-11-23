@@ -91,7 +91,7 @@ class BlocklyType:
         cast_post = ""
         deserialize_expression = ""
 
-        if type == "integer" or type == "number":
+        if type in ["integer", "number"]:
             cast_pre = "Number("
             cast_post = ")"
             type = "number"
@@ -115,11 +115,7 @@ class BlocklyType:
             type = "label_serializable"
             kwargs["text"] = str(kwargs.pop("const"))
 
-        field = {
-            "type": "field_" + type,
-            "name": name,
-            **kwargs
-        }
+        field = {"type": f"field_{type}", "name": name, **kwargs}
 
         self.add_arg(field)
         self.add_newline()
@@ -171,7 +167,7 @@ class BlocklyType:
         )
 
     def add_label(self, label):
-        self.message += " " + label
+        self.message += f" {label}"
 
     def add_input(self, label, name, split=False, type_hint="", animated=False, fixed_object=None, default_block=None, **kwargs):
         self.add_label(label)
@@ -264,7 +260,7 @@ class BlocklyType:
         cast_post = ""
         deserialize_expression = ""
 
-        if type == "integer" or type == "number":
+        if type in ["integer", "number"]:
             cast_pre = "Number("
             cast_post = ")"
             deserialize_expression = ".toString()"
@@ -417,7 +413,6 @@ class SchemaProperties:
         elif type == "object":
             kwargs = {}
             type_hint = ""
-            split = False
             animated = False
             fixed_object = None
 
@@ -436,9 +431,7 @@ class SchemaProperties:
                 if fixed_object:
                     kwargs["check"] = fixed_object
 
-            if name == "p":
-                split = True
-
+            split = name == "p"
             default_block = self.ref_to_object_check(ref) if name in self.required else None
             blockly.add_input(label, name, split, type_hint, animated, fixed_object, default_block, **kwargs)
         elif ref == "#/$defs/helpers/color":
@@ -450,8 +443,9 @@ class SchemaProperties:
                 if "oneOf" in property["items"] and "$ref" in property["items"]["oneOf"][0]:
                     kwargs["check"] = property["items"]["oneOf"][0]["$ref"].split("/")[-2].replace("-", "_")
                 elif "$ref" in property["items"]:
-                    check = self.ref_to_object_check(property["items"]["$ref"])
-                    if check:
+                    if check := self.ref_to_object_check(
+                        property["items"]["$ref"]
+                    ):
                         kwargs["check"] = check
                 elif property["items"].get("type", "") == "number":
                     blockly.add_input(label, name, check="color")
@@ -468,7 +462,7 @@ class SchemaProperties:
         cls = chunks[-1]
         if group in categories:
             cat = categories[group]
-            return "lottie_" + cat.infix + cls.replace("-", "_")
+            return f"lottie_{cat.infix}" + cls.replace("-", "_")
         elif cls in ("transform", "gradient-colors"):
             return "lottie_" + cls.replace("-", "_")
         return None
@@ -481,12 +475,12 @@ def convert_object(schema_object, schema):
 
     link = help_links[0]
 
-    help_url = "/lottie-docs/%s/#%s" % (link.page, link.anchor)
+    help_url = f"/lottie-docs/{link.page}/#{link.anchor}"
 
     cat = categories[link.group]
     label = schema_object["title"]
     path = str(schema_object.path)
-    name = "lottie_" + cat.infix + link.cls.replace("-", "_")
+    name = f"lottie_{cat.infix}" + link.cls.replace("-", "_")
     hue = custom_colors.get(path, cat.hue)
     if path == "#/$defs/shapes/transform":
         name += "_shape"
@@ -498,8 +492,7 @@ def convert_object(schema_object, schema):
     blockly_types.setdefault(link.group, []).append(blockly)
     blockly.add_label(label)
 
-    icon = icons.get(path, None)
-    if icon:
+    if icon := icons.get(path, None):
         blockly.add_image(icon)
 
     blockly.add_newline()
@@ -558,8 +551,7 @@ def write_js(file):
             json.dump(obj.to_json_array(), file, indent=4)
             file.write(",\n")
             toolbox_item = {"kind": "block", "type": obj.type}
-            blockxml = BlockDef.block_definition(obj.type, False)
-            if blockxml:
+            if blockxml := BlockDef.block_definition(obj.type, False):
                 toolbox_item["blockxml"] = ElementTree.tostring(blockxml.get_element()).decode("us-ascii")
             cat_contents.append(toolbox_item)
 
@@ -670,8 +662,8 @@ with open(schema_filename) as file:
 
 schema = Schema(data)
 
-for cat in categories.keys():
-    convert_group(schema.get_ref("#/$defs/" + cat), schema)
+for cat in categories:
+    convert_group(schema.get_ref(f"#/$defs/{cat}"), schema)
 
 BlockDef.block_definition("lottie_animation").fields = {
     "op": 60

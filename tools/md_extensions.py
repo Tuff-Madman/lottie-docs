@@ -20,22 +20,18 @@ docs_path = Path(__file__).parent.parent / "docs"
 
 def etree_fontawesome(icon, group="fas"):
     el = etree.Element("i")
-    el.attrib["class"] = "%s fa-%s" % (group, icon)
+    el.attrib["class"] = f"{group} fa-{icon}"
     return el
 
 
 def clean_link(filename):
     if not filename.startswith("/") and not filename.startswith("."):
-        filename = "../" + filename
+        filename = f"../{filename}"
     return filename
 
 
 def css_style(**args):
-    string = ""
-    for k, v in args.items():
-        string += "%s:%s;" % (k.replace("_", "-"), v)
-
-    return string
+    return "".join(f'{k.replace("_", "-")}:{v};' for k, v in args.items())
 
 
 class LottieRenderer:
@@ -59,13 +55,13 @@ class LottieRenderer:
         self.animation_container.attrib["class"] = "animation-container alpha_checkered"
 
         self.animation = etree.SubElement(self.animation_container, "div")
-        self.animation.attrib["id"] = "lottie_target_%s" % self.id
+        self.animation.attrib["id"] = f"lottie_target_{self.id}"
 
         self.width = width
         self.height = height
 
         if width:
-            self.animation.attrib["style"] = "width:%spx;height:%spx" % (width, height)
+            self.animation.attrib["style"] = f"width:{width}px;height:{height}px"
 
         self.button_container = etree.SubElement(element, "div")
 
@@ -176,7 +172,7 @@ class LottieInlineProcessor(InlineProcessor):
         super().__init__(pattern, md)
 
     def handleMatch(self, m, data):
-        filename = "examples/" + m.group(1)
+        filename = f"examples/{m.group(1)}"
         lottie_url = get_url(self.md, filename)
         # mkdocs will perform something similar to get_url to all the href, so we counteract it...
         download_file = lottie_url[3:]
@@ -215,7 +211,7 @@ class LottieColor(InlineProcessor):
         if self.mult == -1:
             code.text = hex
         else:
-            code.text = "[%s]" % ", ".join("%.3g" % x for x in comp)
+            code.text = f'[{", ".join("%.3g" % x for x in comp)}]'
 
         return span, match.start(0), match.end(0)
 
@@ -242,10 +238,10 @@ class Matrix(BlockProcessor):
 
 def enum_values(schema: Schema, name):
     enum = schema.get_ref(["$defs", "constants", name])
-    data = []
-    for item in enum["oneOf"]:
-        data.append((item["const"], item["title"], item.get("description", "")))
-    return data
+    return [
+        (item["const"], item["title"], item.get("description", ""))
+        for item in enum["oneOf"]
+    ]
 
 
 class ReferenceLink:
@@ -267,7 +263,7 @@ class ReferenceLink:
 
     def to_element(self, parent, links):
         type_text = etree.SubElement(parent, "a")
-        type_text.attrib["href"] = "%s.md#%s" % (self.page, self.anchor)
+        type_text.attrib["href"] = f"{self.page}.md#{self.anchor}"
         type_text.text = self.name
         type_text.tail = " "
         if self.cls == "int-boolean":
@@ -286,10 +282,10 @@ class ReferenceLink:
 
 def ref_links(ref: str, data: Schema):
     chunks = ref.strip("#/").split("/")
-    if len(chunks) > 0 and chunks[0] == "$defs":
+    if chunks and chunks[0] == "$defs":
         chunks.pop(0)
     else:
-        ref = "#/$defs/" + ref
+        ref = f"#/$defs/{ref}"
 
     if len(chunks) != 2:
         return []
@@ -305,8 +301,7 @@ def ref_links(ref: str, data: Schema):
         "name_prefix": "",
     }
 
-    mapping_data = ReferenceLink.mapping_data().get(group, None)
-    if mapping_data:
+    if mapping_data := ReferenceLink.mapping_data().get(group, None):
         values.update(mapping_data.get("_defaults", {}))
         values.update(mapping_data.get(cls, {}))
 
@@ -342,26 +337,21 @@ class SchemaEnum(BlockProcessor):
         enum_data = enum_values(self.schema_data, enum_name)
 
         table = etree.SubElement(parent, "table")
-        descriptions = {}
-
-        for value, name, description in enum_data:
-            if description:
-                descriptions[str(value)] = description
-
+        descriptions = {
+            str(value): description
+            for value, name, description in enum_data
+            if description
+        }
         # Override descriptions if specified from markdown
         rows = blocks.pop(0)
         for row in rows.split("\n")[1:]:
-            match = self.re_row.match(row)
-            if match:
+            if match := self.re_row.match(row):
                 descriptions[match.group(0)] = match.group(1)
 
         thead = etree.SubElement(etree.SubElement(table, "thead"), "tr")
         etree.SubElement(thead, "th").text = "Value"
-        etree.SubElement(thead, "th").text = "Name"
-        if descriptions:
-            etree.SubElement(thead, "th").text = "Description"
-
-        thead[-1].append(SchemaLink.element("constants/" + enum_name))
+        etree.SubElement(thead, "th").text = "Description" if descriptions else "Name"
+        thead[-1].append(SchemaLink.element(f"constants/{enum_name}"))
 
         tbody = etree.SubElement(table, "tbody")
 
@@ -485,22 +475,28 @@ class LottiePlaygroundBuilder:
 
     def code_viewer(self, title, icon, language, source, start_hidden=True):
         code_viewer_id = self.control_id()
-        code_viewer_parent_id = code_viewer_id + "_parent"
+        code_viewer_parent_id = f"{code_viewer_id}_parent"
 
         toggle_code = self.renderer.add_button(
-            onclick=inspect.cleandoc(r"""
+            onclick=inspect.cleandoc(
+                r"""
                 var element = document.getElementById('{code_viewer_parent_id}');
                 element.hidden = !element.hidden;
-            """).format(code_viewer_parent_id=code_viewer_parent_id),
+            """
+            ).format(code_viewer_parent_id=code_viewer_parent_id),
             icon=icon,
-            text=" Show " + title,
-            title="Toggle " + title
+            text=f" Show {title}",
+            title=f"Toggle {title}",
         )
 
         pre = etree.SubElement(self.element, "pre", {"id": code_viewer_parent_id})
         if start_hidden:
             pre.attrib["hidden"] = "hidden"
-        code = etree.SubElement(pre, "code", {"id": code_viewer_id, "class": "language-%s hljs" % language})
+        code = etree.SubElement(
+            pre,
+            "code",
+            {"id": code_viewer_id, "class": f"language-{language} hljs"},
+        )
         code.text = AtomicString(source)
         return code_viewer_id
 
@@ -538,12 +534,11 @@ class LottiePlayground(BlockProcessor):
         for index, line in enumerate(block.strip().split("\n")[1:]):
             if html_append_until:
                 html_string += line + "\n"
-                if html_append_until in line:
-                    html_append_until = None
-                    html_close = True
-                else:
+                if html_append_until not in line:
                     continue
 
+                html_append_until = None
+                html_close = True
             if not html_close:
                 row_match = self.re_row.match(line)
                 if not row_match:
@@ -555,8 +550,8 @@ class LottiePlayground(BlockProcessor):
                 if not html_string:
                     builder.add_control(label, None)
                     continue
-                if "/>" not in html_string and "</" + tag not in html_string:
-                    html_append_until = "</" + tag + ">"
+                if "/>" not in html_string and f"</{tag}" not in html_string:
+                    html_append_until = f"</{tag}>"
                     continue
             else:
                 html_close = False
@@ -581,14 +576,10 @@ class LottiePlayground(BlockProcessor):
             return json.dumps(json.load(file))
 
     def populate_script(self, blocks, match, builder, json_data, extra_options, json_viewer_id, json_viewer_path):
-        # <script> are gobbled up by a preprocessor
-        script = ""
         script_element = self.pop_script_block(blocks)
-        if script_element is not None:
-            script = script_element.text
-
+        script = script_element.text if script_element is not None else ""
         if json_viewer_path:
-            script += "this.json_viewer_contents = %s;" % json_viewer_path
+            script += f"this.json_viewer_contents = {json_viewer_path};"
 
         builder.renderer.populate_script("""
         var lottie_player_{id} = new PlaygroundPlayer(
@@ -615,7 +606,7 @@ class LottiePlayground(BlockProcessor):
 
     def add_json_viewer(self, builder, parent):
         code_viewer_id = builder.control_id()
-        parent.attrib["id"] = code_viewer_id + "_parent"
+        parent.attrib["id"] = f"{code_viewer_id}_parent"
         parent.attrib["hidden"] = "hidden"
 
         builder.add_button(
@@ -635,8 +626,7 @@ class LottiePlayground(BlockProcessor):
 
 
 def pop_script_block(block_processor, blocks):
-    script_match = HTML_PLACEHOLDER_RE.match(blocks[0])
-    if script_match:
+    if script_match := HTML_PLACEHOLDER_RE.match(blocks[0]):
         index = int(script_match.group(1))
         raw_string = block_processor.parser.md.htmlStash.rawHtmlBlocks[index]
         if "<script" in raw_string:
@@ -658,7 +648,7 @@ class ShapeBezierScript(LottiePlayground):
 
     def populate_script(self, blocks, match, builder, json_data, extra_options, json_viewer_id, json_viewer_path):
         bezier_view = etree.SubElement(builder.renderer.animation_container, "div")
-        bezier_view.attrib["id"] = "lottie_target_%s_bezier" % builder.anim_id
+        bezier_view.attrib["id"] = f"lottie_target_{builder.anim_id}_bezier"
         bezier_view.attrib["style"] = builder.renderer.animation.attrib["style"]
 
         func_script = ""
@@ -669,28 +659,26 @@ class ShapeBezierScript(LottiePlayground):
             if blocks[0] == '':
                 blocks = blocks[1:]
             script_element = self.pop_script_block(blocks)
-            if script_element is not None:
-                if "func" in script_element.attrib:
-                    func = script_element.attrib["func"]
-                    varname = script_element.attrib.get("varname", "shape")
-                    func_script = script_element.text
-
-                    pre = etree.SubElement(builder.element, "pre")
-                    # We don't use `js` highlighting because it's a bit bugged
-                    code = etree.SubElement(pre, "code", {"class": "language-typescript hljs"})
-                    code.text = AtomicString(
-                        func_script + "\n\n// Example invocation\n" + func + ";"
-                    )
-                else:
-                    non_func_script = script_element.text
-            else:
+            if script_element is None:
                 break
 
-        ty = match.group("ty")
-        set_conv = ""
-        if ty:
-            set_conv = "converter_map[%r] = %s => %s;" % (ty, varname, func)
+            if "func" in script_element.attrib:
+                func = script_element.attrib["func"]
+                varname = script_element.attrib.get("varname", "shape")
+                func_script = script_element.text
 
+                pre = etree.SubElement(builder.element, "pre")
+                # We don't use `js` highlighting because it's a bit bugged
+                code = etree.SubElement(pre, "code", {"class": "language-typescript hljs"})
+                code.text = AtomicString(
+                    func_script + "\n\n// Example invocation\n" + func + ";"
+                )
+            else:
+                non_func_script = script_element.text
+        if ty := match.group("ty"):
+            set_conv = "converter_map[%r] = %s => %s;" % (ty, varname, func)
+        else:
+            set_conv = ""
         if json_viewer_path:
             builder.renderer.populate_script("""
                 {func_script}
@@ -737,7 +725,9 @@ class ShapeBezierScript(LottiePlayground):
     def add_json_viewer(self, builder, parent):
         id = super().add_json_viewer(builder, parent)
         pre = etree.SubElement(parent, "pre")
-        code = etree.SubElement(pre, "code", {"id": id + "_bezier", "class": "language-json hljs"})
+        code = etree.SubElement(
+            pre, "code", {"id": f"{id}_bezier", "class": "language-json hljs"}
+        )
         code.text = ""
         return id
 
@@ -748,7 +738,7 @@ class EffectShaderScript(LottiePlayground):
     def populate_script(self, blocks, match, builder, json_data, extra_options, json_viewer_id, json_viewer_path):
         shader_view = etree.SubElement(builder.renderer.animation_container, "canvas")
         shader_view.attrib["class"] = "webgl-shader"
-        shader_view.attrib["id"] = "lottie_target_%s_canvas" % builder.anim_id
+        shader_view.attrib["id"] = f"lottie_target_{builder.anim_id}_canvas"
         shader_view.attrib["style"] = builder.renderer.animation.attrib["style"]
         shader_view.attrib["width"] = builder.renderer.width
         shader_view.attrib["height"] = builder.renderer.height
@@ -760,23 +750,22 @@ class EffectShaderScript(LottiePlayground):
             if blocks[0] == '':
                 blocks = blocks[1:]
             script_element = self.pop_script_block(blocks)
-            if script_element is not None:
-                if script_element.attrib.get("type", "") == "x-shader/x-fragment":
-                    shader_source = script_element.text.strip();
-
-                    pre = etree.SubElement(builder.element, "pre")
-                    # No glsl ;_;
-                    code = etree.SubElement(pre, "code", {"class": "language-c hljs"})
-                    code.text = AtomicString(shader_source)
-                    shader_sources.append((shader_source, int(script_element.attrib.get("passes", "1"))))
-                else:
-                    script = script_element.text
-            else:
+            if script_element is None:
                 break
 
 
+            if script_element.attrib.get("type", "") == "x-shader/x-fragment":
+                shader_source = script_element.text.strip();
+
+                pre = etree.SubElement(builder.element, "pre")
+                # No glsl ;_;
+                code = etree.SubElement(pre, "code", {"class": "language-c hljs"})
+                code.text = AtomicString(shader_source)
+                shader_sources.append((shader_source, int(script_element.attrib.get("passes", "1"))))
+            else:
+                script = script_element.text
         if json_viewer_path:
-            script += "this.json_viewer_contents = %s;" % json_viewer_path
+            script += f"this.json_viewer_contents = {json_viewer_path};"
 
         shader_class = "";
         shader_load = "";
@@ -813,7 +802,7 @@ class EffectShaderScript(LottiePlayground):
                         shader_source=repr(shader_source),
                         program=program,
                     );
-                    for i in range(pass_count):
+                    for _ in range(pass_count):
                         shader_load += """
                             lottie_shader_{id}.add_pass({program}, {{"pass": ["1i", {pass_index}]}})
                         """.format(
@@ -877,13 +866,11 @@ class SchemaObject(BlockProcessor):
             return prop["$ref"]
         if "type" in prop:
             return prop["type"]
-        if "oneOf" in prop:
-            return [self._type(t) for t in prop["oneOf"]]
-        return ""
+        return [self._type(t) for t in prop["oneOf"]] if "oneOf" in prop else ""
 
     def _add_properties(self, schema_props, prop_dict):
         for name, prop in schema_props.items():
-            data = dict((k, v) for k, v in prop.items() if k in self.prop_fields)
+            data = {k: v for k, v in prop.items() if k in self.prop_fields}
             data["type"] = self._type(prop)
             if "title" in prop and "description" not in prop:
                 data["description"] = prop["title"]
@@ -907,7 +894,7 @@ class SchemaObject(BlockProcessor):
         link = ref_links(ref, self.schema_data)[0]
         a = etree.SubElement(parent, "a")
         a.text = link.name
-        a.attrib["href"] = "%s.md#%s" % (link.page, link.anchor)
+        a.attrib["href"] = f"{link.page}.md#{link.anchor}"
         return a
 
     def _base_type(self, type, parent):
@@ -930,7 +917,7 @@ class SchemaObject(BlockProcessor):
     def run(self, parent, blocks):
         object_name = self.test(parent, blocks[0]).group(1)
 
-        schema_data = self.schema_data.get_ref("$defs/" + object_name)
+        schema_data = self.schema_data.get_ref(f"$defs/{object_name}")
 
         prop_dict = {}
         base_list = []
@@ -940,8 +927,7 @@ class SchemaObject(BlockProcessor):
         # Override descriptions if specified from markdown
         rows = blocks.pop(0)
         for row in rows.split("\n")[1:]:
-            match = self.re_row.match(row)
-            if match:
+            if match := self.re_row.match(row):
                 name = match.group(1)
                 if name == "EXPAND":
                     prop_dict_base = {}
@@ -964,7 +950,7 @@ class SchemaObject(BlockProcessor):
                 else:
                     if match.group(2):
                         if name not in prop_dict:
-                            raise Exception("Property %s not in %s" % (name, schema_data.path))
+                            raise Exception(f"Property {name} not in {schema_data.path}")
                         prop_dict[name].description = match.group(2)
                     order.append(name)
 
@@ -1053,7 +1039,7 @@ class JsonHtmlSerializer:
             raise TypeError(json_object)
 
     def encode_item(self, json_object, hljs_type, href=None):
-        span = etree.Element("span", {"class": "hljs-"+hljs_type})
+        span = etree.Element("span", {"class": f"hljs-{hljs_type}"})
         span.text = self.encoder.encode(json_object)
 
         if href:
@@ -1071,14 +1057,16 @@ class JsonHtmlSerializer:
             self.encode_item(key, "attr")
             return None
 
-        child_id = id + "/" + key
-        self.encode_item(key, "attr", "#" + child_id)
+        child_id = f"{id}/{key}"
+        self.encode_item(key, "attr", f"#{child_id}")
         self.tail.attrib["id"] = child_id
         if child_id.count("/") == 3:
             for link in ref_links(child_id, self.schema):
                 self.tail.tail += " "
                 self.tail = etree.SubElement(self.parent, "a")
-                self.tail.attrib["href"] = get_url(self.md, link.page + ".md") + "#" + link.anchor
+                self.tail.attrib[
+                    "href"
+                ] = f'{get_url(self.md, f"{link.page}.md")}#{link.anchor}'
                 self.tail.attrib["title"] = link.name
                 icon = etree.SubElement(self.tail, "i")
                 icon.attrib["class"] = "fas fa-book-open"
@@ -1165,14 +1153,14 @@ class SchemaLink(InlineProcessor):
 
     @staticmethod
     def element(path):
-        href = "schema.md#/$defs/" + path
+        href = f"schema.md#/$defs/{path}"
         element = etree.Element("a", {"href": href, "class": "schema-link"})
         element.text = "View Schema"
         return element
 
     @staticmethod
     def icon(path):
-        href = "schema.md#/$defs/" + path
+        href = f"schema.md#/$defs/{path}"
         element = etree.Element("a", {"href": href, "class": "schema-link"})
         element.attrib["title"] = "View Schema"
         etree.SubElement(element, "i").attrib["class"] = "fas fa-file-code"
@@ -1180,7 +1168,7 @@ class SchemaLink(InlineProcessor):
 
     @staticmethod
     def caniuse_icon(feature):
-        href = "https://canilottie.com/" + feature
+        href = f"https://canilottie.com/{feature}"
         element = etree.Element("a", {"href": href, "class": "schema-link"})
         element.attrib["title"] = "View Compatibility"
         etree.SubElement(element, "i").attrib["class"] = "fas fa-list-check"
@@ -1204,7 +1192,7 @@ class SchemaEffect(BlockProcessor):
         effect_name = self.test(parent, blocks[0]).group(1)
         blocks.pop(0)
 
-        effect_schema = self.schema_data.get_ref("$defs/" + effect_name)
+        effect_schema = self.schema_data.get_ref(f"$defs/{effect_name}")
         effect_data = effect_schema["allOf"][-1]["properties"]["ef"]["prefixItems"]
 
         table = etree.SubElement(parent, "table")
@@ -1213,7 +1201,7 @@ class SchemaEffect(BlockProcessor):
         etree.SubElement(thead, "th").text = "Name"
         etree.SubElement(thead, "th").text = "Type"
 
-        thead[-1].append(SchemaLink.icon("effects/" + effect_name))
+        thead[-1].append(SchemaLink.icon(f"effects/{effect_name}"))
         if "caniuse" in effect_schema:
             thead[-1].append(SchemaLink.caniuse_icon(effect_schema["caniuse"]))
 
@@ -1228,7 +1216,9 @@ class SchemaEffect(BlockProcessor):
             elif href.startswith("effect-"):
                 href = href[len("effect-"):]
             value_name = self.schema_data.get_ref(item["$ref"])["title"]
-            etree.SubElement(etree.SubElement(tr, "td"), "a", {"href": "#" + href}).text = value_name
+            etree.SubElement(
+                etree.SubElement(tr, "td"), "a", {"href": f"#{href}"}
+            ).text = value_name
 
         return True
 
@@ -1249,10 +1239,7 @@ class VariableDocInfo:
         return cls(name, type, description, default)
 
     def type_code(self):
-        if " " in self.type:
-            return "any"
-
-        return self.type
+        return "any" if " " in self.type else self.type
 
     def type_html(self, parent):
         for subtype in self.type.split("|"):
@@ -1261,7 +1248,7 @@ class VariableDocInfo:
             elif subtype in ("array", "number", "boolean", "string", "object") or subtype.startswith("array"):
                 tail = etree.SubElement(parent, "code")
             else:
-                tail = etree.SubElement(parent, "a", {"href": "#" + subtype.lower()})
+                tail = etree.SubElement(parent, "a", {"href": f"#{subtype.lower()}"})
 
             tail.text = subtype
             tail.tail = "|"
@@ -1460,8 +1447,12 @@ class ScriptPlayground(Preprocessor):
                         etree.SubElement(etree.SubElement(div, "pre"), "code", {"class": self.tabs[k][0]}).text = v
 
                         if len(data) > 1:
-                            tab_id = "script_playground_%s_%s" % (id, k)
-                            etree.SubElement(etree.SubElement(tab_nav, "li"), "a", {"href": "#" + tab_id}).text = self.tabs[k][1]
+                            tab_id = f"script_playground_{id}_{k}"
+                            etree.SubElement(
+                                etree.SubElement(tab_nav, "li"),
+                                "a",
+                                {"href": f"#{tab_id}"},
+                            ).text = self.tabs[k][1]
                             div.attrib = {"id": tab_id, "class": "tab-pane fade in"}
 
                     if "css" in data:
@@ -1472,9 +1463,9 @@ class ScriptPlayground(Preprocessor):
                         div.append(etree.fromstring("<div class='playground_html'>" + data["html"] + "</div>"))
 
                         if len(data) > 1:
-                            tab_id = "script_playground_%s_preview" % (id)
+                            tab_id = f"script_playground_{id}_preview"
                             li = etree.SubElement(tab_nav, "li", {"class": "active"})
-                            etree.SubElement(li, "a", {"href": "#" + tab_id}).text = "Result"
+                            etree.SubElement(li, "a", {"href": f"#{tab_id}"}).text = "Result"
                             div.attrib = {"id": tab_id, "class": "tab-pane fade in active"}
 
                     html = etree.tostring(element, "unicode", method="html")
@@ -1487,7 +1478,7 @@ class ScriptPlayground(Preprocessor):
                     if script:
                         if options.get("global-script", "") != "1":
                             script = "(function(){%s})();" % script
-                        html += "<script>%s</script>" % script
+                        html += f"<script>{script}</script>"
 
                     placeholder = self.md.htmlStash.store(html)
                     new_lines.append(placeholder)
@@ -1548,10 +1539,10 @@ class EditorExample(BlockProcessor):
 
         element = etree.SubElement(parent, "div", {"class": "playground"})
 
-        editor = etree.SubElement(element, "div", {"id": "editor_" + id_base})
+        editor = etree.SubElement(element, "div", {"id": f"editor_{id_base}"})
 
-        json_viewer = "json_viewer_%s" % id_base
-        json_viewer_parent = json_viewer + "_parent"
+        json_viewer = f"json_viewer_{id_base}"
+        json_viewer_parent = f"{json_viewer}_parent"
 
         toggle_json = etree.SubElement(element, "button")
         toggle_json.attrib["onclick"] = inspect.cleandoc(r"""
@@ -1628,15 +1619,14 @@ class AepMatchNameTable(BlockProcessor):
             etree.SubElement(etree.SubElement(tr, "td"), "code").text = match.group("mn")
 
             td = etree.SubElement(tr, "td")
-            what = match.group("what")
-            if what:
+            if what := match.group("what"):
                 if what == "object":
                     ref = "$defs/" + match.group("lottie")
                     lottie_obj = self.schema_data.get_ref(ref)
                     link = ref_links(ref, self.schema_data)[0]
                     a = etree.SubElement(td, "a")
                     a.text = link.name
-                    a.attrib["href"] = "%s.md#%s" % (link.page, link.anchor)
+                    a.attrib["href"] = f"{link.page}.md#{link.anchor}"
                 elif what == "prop":
                     etree.SubElement(td, "code").text = match.group("lottie")
 
@@ -1660,7 +1650,7 @@ class SectionLinkInlineProcessor(InlineProcessor):
         text = m.group(1)
         id = self.unescape(text).replace(" ", "-").lower()
         element = etree.Element("a")
-        element.attrib["href"] = "#" + id
+        element.attrib["href"] = f"#{id}"
         element.text = text
 
         return element, m.start(0), m.end(0)

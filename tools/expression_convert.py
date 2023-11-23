@@ -4,11 +4,7 @@ import json
 
 def variable(name=None, type=None, description=None, default=None, notes=None):
     params = dict(locals())
-    ret = {}
-    for k, v in params.items():
-        if v is not None:
-            ret[k] = v
-    return ret
+    return {k: v for k, v in params.items() if v is not None}
 
 
 name = ret = description = None
@@ -35,7 +31,7 @@ for line in sys.stdin:
                 fdef["return"] = variable(None, *ret)
 
             data = json.dumps({name: fdef}, indent=4)
-            print(data[1:-2]+",")
+            print(f"{data[1:-2]},")
 
             name = ret = description = None
             params = []

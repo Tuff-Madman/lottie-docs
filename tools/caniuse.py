@@ -50,12 +50,14 @@ for path in sorted(ns.caniuse.glob("*.json")):
             if data.get("spec", ""):
                 print(indent + data["spec"])
             else:
-                print(indent + "https://github.com/lottie-animation-community/caniuse/blob/main/data/%s" % path.name)
+                print(
+                    f"{indent}https://github.com/lottie-animation-community/caniuse/blob/main/data/{path.name}"
+                )
 
             for link in data.get("links", []):
                 print(indent + link["url"])
 
-        print(indent + '"caniuse": "%s",' % path.stem)
+        print(f'{indent}"caniuse": "{path.stem}",')
 
 
 sys.exit(not_found)
